@@ -1,0 +1,19 @@
+{
+  "name": "file-validator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd src && ts-node index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^20.11.0",
+    "fs": "0.0.1-security",
+    "jszip": "^3.10.1",
+    "node-stream-zip": "^1.15.0",
+    "path": "^0.12.7"
+  }
+}
