@@ -15,6 +15,7 @@ import StreamZip from 'node-stream-zip'
 // // Do not forget to close the file once you're done
 // await zip.close()
 
+export const IS_ZIP_ENTRY = Symbol('IS_ZIP_ENTRY')
 export class CompressedAdapter {
   zipFilePath: string
 
@@ -27,7 +28,7 @@ export class CompressedAdapter {
 
     try {
       const entries = await zip.entries()
-      console.log(entries)
+      // console.log(entries)
       const fileTree = {}
 
       for (const entry of Object.values(entries)) {
@@ -45,7 +46,7 @@ export class CompressedAdapter {
         }
 
         // Add file information
-        currentLevel = entry
+        Object.assign(currentLevel, entry, { [IS_ZIP_ENTRY]: true })
       }
 
       return fileTree

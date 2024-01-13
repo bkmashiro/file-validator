@@ -21,10 +21,15 @@ async function main() {
                 content: {
                   type: 'dir',
                   rules: {
-                    dirname: 'b',
+                    dirname: 'folder',
                     has: {
-                      'b.txt': {
-                        type: 'file',
+                      folder: {
+                        type: 'dir',
+                        rules: {
+                          has: {
+                            'a.txt': 'file',
+                          },
+                        },
                       },
                     },
                   },

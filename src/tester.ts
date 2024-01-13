@@ -11,7 +11,7 @@ import {
   FileSubType,
   CompressedFileRule,
 } from './decl'
-import { CompressedAdapter } from './compressed'
+import { CompressedAdapter, IS_ZIP_ENTRY } from './compressed'
 import { ZipEntry } from 'node-stream-zip'
 
 type ProviderEnv = 'compressed' | 'os'
@@ -82,23 +82,28 @@ type ZipFileInfo = {
 class CompressedFileProvider implements FileProvider {
   env: ProviderEnv = 'compressed'
   cp: CompressedAdapter
-  fileInfo: ZipFileInfo
+  fileInfo: ZipFileInfo | null
   current = ''
   constructor(file: string) {
-    this.init(file)
+    //TODO: if already creared CompressedAdapter, use it
+    this.fileInfo = null
     this.cp = new CompressedAdapter(file)
-    this.fileInfo = {}
+    this.init(file)
   }
 
-  enumerate(): FileProvider[] | PromiseLike<FileProvider[]> {
+  async enumerate(): Promise<FileProvider[]> {
     // enumerate all files and folders in current folder
+    await this.checkInit()
     const cur = this.curr as unknown as ZipFileInfo
-    if (cur.isDirectory) {
-      return Object.entries(cur).map(([name, info]) => {
+    if (!Object.getOwnPropertyDescriptor(cur, IS_ZIP_ENTRY)) {
+      // console.log(`enumerates:`, Object.keys(cur))
+      const ret = Object.entries(cur).map(([name, info]) => {
         const cp = new CompressedFileProvider(this.cp.zipFilePath)
         cp.current = path.join(this.current, name)
         return cp
       })
+      // console.log(`enumerates:`, ret)
+      return ret
     } else {
       throw new Error('Not a directory')
     }
@@ -110,15 +115,34 @@ class CompressedFileProvider implements FileProvider {
   }
 
   _stats() {
-    const cur = this.curr as unknown as ZipEntry
-    return {
-      time: cur.time,
-      compressedSize: cur.size,
-      size: cur.size,
-      name: cur.name,
-      isDirectory: cur.isDirectory,
-      isFile: !cur.isDirectory,
-      comment: cur.comment,
+    const cur = this.curr
+    // console.log(`_stats`, cur)
+    if (Object.getOwnPropertyDescriptor(cur, IS_ZIP_ENTRY)) {
+      const info = cur as unknown as ZipEntry
+      // console.log(`_stats1`, info)
+
+      return {
+        time: info.time,
+        compressedSize: info.compressedSize,
+        size: info.size,
+        // name: info.name.split('/').pop() as string,
+        name: info.name,
+        isDirectory: false,
+        isFile: true,
+        comment: info.comment,
+      }
+    } else {
+      const info = cur as unknown as ZipFileInfo
+      // console.log(`_stats2`, info)
+      return {
+        time: 0,
+        compressedSize: 0,
+        size: 0,
+        name: path.basename(this.current),
+        isDirectory: true,
+        isFile: false,
+        comment: '',
+      }
     }
   }
 
@@ -128,7 +152,7 @@ class CompressedFileProvider implements FileProvider {
   }
 
   _isFile() {
-    return !this.fileInfo.info.isDirectory as boolean
+    return !this.fileInfo!.info.isDirectory as boolean
   }
 
   async isDirectory() {
@@ -137,29 +161,38 @@ class CompressedFileProvider implements FileProvider {
   }
 
   _isDirectory() {
-    return this.fileInfo.info.isDirectory as boolean
+    return this.fileInfo!.info.isDirectory as boolean
   }
 
-  init(file: string) {
-    this.cp.getFileInfo().then((info) => {
-      this.fileInfo = info
-    })
+  async init(file: string) {
+    this.fileInfo = await this.cp.getFileInfo()
+    // console.log(`init`, this.fileInfo)
   }
 
-  async checkInit(oldFunc: Function, newFunc: Function) {
+  async checkInit(oldFunc?: Function, newFunc?: Function) {
     if (!this.fileInfo) {
       await this.cp.getFileInfo()
     }
 
-    oldFunc = newFunc
+    if (oldFunc && newFunc) {
+      oldFunc = newFunc
+    }
   }
 
-  public get curr(): ZipFileInfo {
+  public get curr(): ZipFileInfo | null {
     const pathComponents = this.current.split('/')
-    let currentLevel: ZipFileInfo = this.fileInfo
+    if (pathComponents[0] === '') {
+      pathComponents.shift()
+    }
+    let currentLevel = this.fileInfo
+
     for (const component of pathComponents) {
+      if (!currentLevel?.[component]) {
+        throw new Error(`File not found: ${component}`)
+      }
       currentLevel = currentLevel[component] as ZipFileInfo
     }
+
     return currentLevel
   }
 }
@@ -341,10 +374,34 @@ class Tester {
   matchSubType = async (
     type: FileSubType,
     rules: FileRule,
-    path: FileProvider,
+    file: FileProvider,
   ): Promise<boolean> => {
     if (type === 'compressed') {
       const cfr = rules as CompressedFileRule
+      // Note that, in a compressed file, we're not able to check the content
+      // of a file, so we only check the structure of the file
+
+      if (!this.matchName(file, /\.zip$/)) {
+        bindMsg(rules, 'subtype', `ILLEGAL: ${cfr.subtype}`)
+        return false
+      }
+
+      if (file.env === 'os') {
+        const fullpath = (file as OSFileProvider).path
+        const cp = new CompressedFileProvider(fullpath)
+        const rules = cfr.content.rules
+        if (rules) {
+          bindMsg(rules, 'subtype', `DEEP_VALIDATED: ${cfr.subtype}`)
+          return await this.matchDirRules(rules, cp)
+        } else {
+          bindMsg(cfr, 'subtype', `NO_RULES: ${cfr.subtype}`)
+          return true
+        }
+      } else {
+        // nested compressed file, do not check deeper
+        bindMsg(rules, 'subtype', `NOT_SUPPORTED: nested compressed file`)
+        return true
+      }
     } else if (type === 'text') {
       // TODO
     } else if (type === 'binary') {
@@ -436,7 +493,6 @@ class Tester {
       const files = await file.enumerate()
       const has = rules.has!
       for (const [key, value] of Object.entries(has)) {
-        const filePath = path.join((await file.stats()).name, key)
         const found = await findFilenameAsync(files, key)
         if (!found) {
           appendMsg(rules, 'has', `MISSING: "${key}"`)
@@ -467,7 +523,12 @@ class Tester {
 
     async function findFilenameAsync(files: FileProvider[], key: string) {
       for (const file of files) {
-        if ((await file.stats()).name === key) {
+        let filename = (await file.stats()).name
+        if (file.env === 'compressed') {
+          filename = filename.split('/').pop() as string
+        }
+        console.log(`findFilenameAsync: ${filename} === ${key}`)
+        if (filename === key) {
           return file
         }
       }
