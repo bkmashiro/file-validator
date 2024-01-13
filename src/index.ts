@@ -7,7 +7,7 @@ const test_path = '/home/shiyuzhe/lab/file-validator/test'
 async function main() {
   const tester = new Tester()
   console.log(
-    tester.TestDir(
+    await tester.TestDir(
       {
         type: 'dir',
         rules: {

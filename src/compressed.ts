@@ -45,7 +45,7 @@ export class CompressedAdapter {
         }
 
         // Add file information
-        currentLevel.info = entry
+        currentLevel = entry
       }
 
       return fileTree
