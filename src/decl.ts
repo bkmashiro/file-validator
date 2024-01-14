@@ -27,7 +27,7 @@ type FileSubTypeRule = CompressedFileRule | TextFileRule | BinaryFileRule
 
 type CompressedFileRule = {
   subtype: 'compressed'
-  content: DirTestObject  //since we dont want uncompress the file, we just check the structure of the compressed file
+  content: DirRule  //since we dont want uncompress the file, we just check the structure of the compressed file
 }
 
 type TextFileRule = {
@@ -57,7 +57,7 @@ type FileRule = FileRuleBase | RuleOp<FileRuleBase>
 
 type FileTestObject = {
   type: 'file'
-  rules?: OneFileRuleBase | ManyFileRuleBase | FileRule
+  rules?: FileRule
 }
 
 type DirNameRule = {
@@ -76,10 +76,11 @@ type OneDirRuleBase = DirNameRule | DirSizeRule | DirHasRule
 type ManyDirRuleBase = Partial<DirNameRule & DirSizeRule & DirHasRule>
 type DirRuleBase = OneDirRuleBase | ManyDirRuleBase
 type DirRule = DirRuleBase | RuleOp<DirRuleBase>
+type CompressedDirRule = Omit<DirRuleBase, 'folder'>
 
 type DirTestObject = {
   type: 'dir'
-  rules?: OneDirRuleBase | ManyDirRuleBase | DirRule
+  rules?: CompressedDirRule
 }
 
 export {

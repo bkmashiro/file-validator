@@ -389,7 +389,8 @@ class Tester {
       if (file.env === 'os') {
         const fullpath = (file as OSFileProvider).path
         const cp = new CompressedFileProvider(fullpath)
-        const rules = cfr.content.rules
+        const rules = cfr.content
+        // folder name is not working in compressed file root, it's unnamed or we can assume it's the same as the file name
         if (rules) {
           bindMsg(rules, 'subtype', `DEEP_VALIDATED: ${cfr.subtype}`)
           return await this.matchDirRules(rules, cp)
