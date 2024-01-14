@@ -27,7 +27,7 @@ type FileSubTypeRule = CompressedFileRule | TextFileRule | BinaryFileRule
 
 type CompressedFileRule = {
   subtype: 'compressed'
-  content: DirRule  //since we dont want uncompress the file, we just check the structure of the compressed file
+  content: CompressedDirRule //since we dont want uncompress the file, we just check the structure of the compressed file
 }
 
 type TextFileRule = {
@@ -38,7 +38,7 @@ type BinaryFileRule = {
   subtype: 'binary'
 }
 
-type Rules = FileRuleBase | DirRuleBase
+type Rules = FileRulePartial | DirRulePartial
 type RuleOp<R extends Rules> =
   | {
       and: R[]
@@ -50,10 +50,9 @@ type RuleOp<R extends Rules> =
       not: R
     }
 
-type OneFileRuleBase = FileNameRule | FileSizeRule | FileSubTypeRule
-type ManyFileRuleBase = Partial<FileNameRule & FileSizeRule & FileSubTypeRule>
-type FileRuleBase = OneFileRuleBase | ManyFileRuleBase
-type FileRule = FileRuleBase | RuleOp<FileRuleBase>
+type FileRuleFull = FileNameRule & FileSizeRule & FileSubTypeRule
+type FileRulePartial = Partial<FileRuleFull>
+type FileRule = FileRulePartial | RuleOp<FileRulePartial>
 
 type FileTestObject = {
   type: 'file'
@@ -71,34 +70,28 @@ type DirSizeRule = {
 type DirHasRule = {
   has: { [key: string]: TestObject | FileType }
 }
-
-type OneDirRuleBase = DirNameRule | DirSizeRule | DirHasRule
-type ManyDirRuleBase = Partial<DirNameRule & DirSizeRule & DirHasRule>
-type DirRuleBase = OneDirRuleBase | ManyDirRuleBase
-type DirRule = DirRuleBase | RuleOp<DirRuleBase>
-type CompressedDirRule = Omit<DirRuleBase, 'folder'>
+type DirRuleFull = DirNameRule & DirSizeRule & DirHasRule
+type DirRulePartial = Partial<DirNameRule & DirSizeRule & DirHasRule>
+type DirRule = DirRulePartial | RuleOp<DirRulePartial>
+type CompressedDirRule = Partial<Omit<DirRuleFull, 'dirname'>>
 
 type DirTestObject = {
   type: 'dir'
-  rules?: CompressedDirRule
+  rules?: DirRule
 }
 
 export {
   DirHasRule,
   DirNameRule,
   DirRule,
-  DirRuleBase,
+  DirRulePartial as DirRuleBase,
   DirSizeRule,
   DirTestObject,
   FileRule,
-  FileRuleBase,
+  FileRulePartial as FileRuleBase,
   FileSizeRule,
   FileTestObject,
-  ManyDirRuleBase,
-  ManyFileRuleBase,
   NameSpecifier,
-  OneDirRuleBase,
-  OneFileRuleBase,
   RuleOp,
   Rules,
   SizeLimit,

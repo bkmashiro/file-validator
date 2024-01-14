@@ -88,7 +88,7 @@ class CompressedFileProvider implements FileProvider {
     //TODO: if already creared CompressedAdapter, use it
     this.fileInfo = null
     this.cp = new CompressedAdapter(file)
-    this.init(file)
+    this.init()
   }
 
   async enumerate(): Promise<FileProvider[]> {
@@ -96,13 +96,11 @@ class CompressedFileProvider implements FileProvider {
     await this.checkInit()
     const cur = this.curr as unknown as ZipFileInfo
     if (!Object.getOwnPropertyDescriptor(cur, IS_ZIP_ENTRY)) {
-      // console.log(`enumerates:`, Object.keys(cur))
       const ret = Object.entries(cur).map(([name, info]) => {
         const cp = new CompressedFileProvider(this.cp.zipFilePath)
         cp.current = path.join(this.current, name)
         return cp
       })
-      // console.log(`enumerates:`, ret)
       return ret
     } else {
       throw new Error('Not a directory')
@@ -116,24 +114,19 @@ class CompressedFileProvider implements FileProvider {
 
   _stats() {
     const cur = this.curr
-    // console.log(`_stats`, cur)
     if (Object.getOwnPropertyDescriptor(cur, IS_ZIP_ENTRY)) {
       const info = cur as unknown as ZipEntry
-      // console.log(`_stats1`, info)
 
       return {
         time: info.time,
         compressedSize: info.compressedSize,
         size: info.size,
-        // name: info.name.split('/').pop() as string,
         name: info.name,
         isDirectory: false,
         isFile: true,
         comment: info.comment,
       }
     } else {
-      const info = cur as unknown as ZipFileInfo
-      // console.log(`_stats2`, info)
       return {
         time: 0,
         compressedSize: 0,
@@ -164,14 +157,17 @@ class CompressedFileProvider implements FileProvider {
     return this.fileInfo!.info.isDirectory as boolean
   }
 
-  async init(file: string) {
-    this.fileInfo = await this.cp.getFileInfo()
-    // console.log(`init`, this.fileInfo)
+  async init() {
+    try {
+      this.fileInfo = await this.cp.getFileInfo()
+    } catch {
+      throw new Error('Not a compressed file')
+    }
   }
 
   async checkInit(oldFunc?: Function, newFunc?: Function) {
     if (!this.fileInfo) {
-      await this.cp.getFileInfo()
+      await this.init()
     }
 
     if (oldFunc && newFunc) {
@@ -392,7 +388,7 @@ class Tester {
         const rules = cfr.content
         // folder name is not working in compressed file root, it's unnamed or we can assume it's the same as the file name
         if (rules) {
-          bindMsg(rules, 'subtype', `DEEP_VALIDATED: ${cfr.subtype}`)
+          bindMsg(rules, 'subtype', `ASSUME_SUBTYPE: ${cfr.subtype}`)
           return await this.matchDirRules(rules, cp)
         } else {
           bindMsg(cfr, 'subtype', `NO_RULES: ${cfr.subtype}`)

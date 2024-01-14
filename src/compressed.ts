@@ -1,20 +1,5 @@
 import StreamZip from 'node-stream-zip'
 
-// const zip = new StreamZip.async({ file: 'archive.zip' })
-
-// const entriesCount = await zip.entriesCount
-
-// console.log(`Entries read: ${entriesCount}`)
-
-// const entries = await zip.entries()
-// for (const entry of Object.values(entries)) {
-//   const desc = entry.isDirectory ? 'directory' : `${entry.size} bytes`
-//   console.log(`Entry ${entry.name}: ${desc}`)
-// }
-
-// // Do not forget to close the file once you're done
-// await zip.close()
-
 export const IS_ZIP_ENTRY = Symbol('IS_ZIP_ENTRY')
 export class CompressedAdapter {
   zipFilePath: string
